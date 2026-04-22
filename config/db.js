@@ -1,16 +1,22 @@
 const mongoose = require("mongoose");
 
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 const connectDB = async () => {
-  try {
-    if (mongoose.connection.readyState === 1) return;
+  if (cached.conn) return cached.conn;
 
-    await mongoose.connect(process.env.MONGO_URI);
-
-    console.log("MongoDB Connected");
-  } catch (error) {
-    console.log("DB Error:", error.message);
-    // ❌ DO NOT exit process in Vercel
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(process.env.MONGO_URI, {
+      bufferCommands: false,
+    });
   }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
 };
 
 module.exports = connectDB;
