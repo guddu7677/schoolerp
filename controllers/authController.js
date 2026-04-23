@@ -1,6 +1,45 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const Student = require("../models/Student");
+
+exports.linkChild = async (req, res) => {
+  try {
+    const { rollNumber, name } = req.body;
+
+    const student = await Student.findOne({
+      rollNumber,
+      name
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        message: "Student not found"
+      });
+    }
+
+    const parent = await User.findById(req.user.id);
+
+    // avoid duplicate
+    if (parent.children?.includes(student._id)) {
+      return res.status(400).json({
+        message: "Child already linked"
+      });
+    }
+
+    parent.children = parent.children || [];
+    parent.children.push(student._id);
+
+    await parent.save();
+
+    res.json({
+      message: "Child linked successfully"
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 exports.register = async (req, res) => {
   try {
