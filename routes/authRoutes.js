@@ -5,5 +5,5 @@ const { register, login } = require("../controllers/authController");
 
 router.post("/register", register);
 router.post("/login", login);
-
+router.post("/link-child", authMiddleware, linkChild);
 module.exports = router;
