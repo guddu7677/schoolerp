@@ -1,51 +1,12 @@
 const User = require("../models/User");
+const Student = require("../models/Student");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const Student = require("../models/Student");
 
-exports.linkChild = async (req, res) => {
-  try {
-    const { rollNumber, name } = req.body;
 
-    const student = await Student.findOne({
-      rollNumber,
-      name
-    });
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found"
-      });
-    }
-
-    const parent = await User.findById(req.user.id);
-
-    // avoid duplicate
-    if (parent.children?.includes(student._id)) {
-      return res.status(400).json({
-        message: "Child already linked"
-      });
-    }
-
-    parent.children = parent.children || [];
-    parent.children.push(student._id);
-
-    await parent.save();
-
-    res.json({
-      message: "Child linked successfully"
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
+// ================= REGISTER =================
 exports.register = async (req, res) => {
   try {
-      console.log("REGISTER API HIT");
-    console.log(req.body);
-
     const { name, email, mobile, password } = req.body;
 
     if (!name || !email || !mobile || !password) {
@@ -53,7 +14,7 @@ exports.register = async (req, res) => {
     }
 
     const existingUser = await User.findOne({
-      $or: [{ email }, { mobile }]
+      $or: [{ email }, { mobile }],
     });
 
     if (existingUser) {
@@ -67,7 +28,7 @@ exports.register = async (req, res) => {
       email,
       mobile,
       password: hashedPassword,
-      role: "parent"
+      role: "parent",
     });
 
     res.status(201).json({
@@ -75,21 +36,22 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+
+// ================= LOGIN =================
 exports.login = async (req, res) => {
   try {
     const { email, mobile, password } = req.body;
 
     const user = await User.findOne({
-      $or: [{ email }, { mobile }]
+      $or: [{ email }, { mobile }],
     }).select("+password");
 
     if (!user) {
@@ -110,9 +72,62 @@ exports.login = async (req, res) => {
 
     res.json({
       message: "Login successful",
-      token
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// ================= LINK CHILD =================
+exports.linkChild = async (req, res) => {
+  try {
+    const { rollNumber, name } = req.body;
+
+    // 🔐 role check
+    if (req.user.role !== "parent") {
+      return res.status(403).json({
+        message: "Only parent can link child",
+      });
+    }
+
+    const student = await Student.findOne({
+      rollNumber,
+      name,
     });
 
+    if (!student) {
+      return res.status(404).json({
+        message: "Student not found",
+      });
+    }
+
+    const parent = await User.findById(req.user.id);
+
+    // 🔐 safe duplicate check
+    const alreadyLinked = parent.children?.some(
+      (id) => id.toString() === student._id.toString()
+    );
+
+    if (alreadyLinked) {
+      return res.status(400).json({
+        message: "Child already linked",
+      });
+    }
+
+    parent.children.push(student._id);
+    await parent.save();
+
+    res.json({
+      message: "Child linked successfully",
+      studentId: student._id,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
